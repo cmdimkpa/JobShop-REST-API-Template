@@ -57,6 +57,10 @@ Something like this:
 
 ## Performance: Speed and Quality of Service (Reliability)
 
-The framework is generally very fast because it makes use of Python's multi-processing capabilities. By analyzing log dumps of its output, such as the one below, I came to the following conclusions about its performance with regards to speed and QoS.
+The framework is generally very fast because it makes use of Python's multi-processing capabilities. By analyzing log dumps of its output, such as the one below, I came to the following conclusions about its performance with regards to speed and QoS:
 
+![image](https://user-images.githubusercontent.com/26833356/35190174-cd27a7b6-fe5b-11e7-82c3-a8be4ed9edb3.png)
 
+1. Speed: the average time between state updates on my sample application is 789.6 ms. A state update happens after a consumer has finished processing a job. This is still less than 1 second, and of course also depends on your network connection (can be much better). But overall, acceptable for normal-latency applications, I should think.
+
+2. 
