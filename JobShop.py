@@ -15,7 +15,7 @@ api = Api(app)
 global RequestQueue, ResponseQueue, Workflow, Stamps, TransactionNumber, THREADS_PER_TRANSACTION, hashkey, MaxMemoryConsumption_KB, \
        MaxHistReqQ, ResponseCache, STATUS200, STATUS404
 
-hashkey = "myveryeyesmayjustseeundernineplanets";
+hashkey = "yourhashkeygoeshere";
 
 RequestQueue = [];
 ResponseQueue = [];
