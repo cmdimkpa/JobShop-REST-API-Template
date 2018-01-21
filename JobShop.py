@@ -7,7 +7,6 @@ from multiprocessing import Pool;
 import datetime;
 import cPickle;
 import time;
-import subprocess;
 
 app = Flask(__name__)
 CORS(app)
@@ -29,13 +28,6 @@ MaxHistReqQ = 0;
 ResponseCache = {};
 STATUS200 = 1;
 STATUS404 = 1;
-
-def shell_runner(cmds):
-    try:
-        proc = subprocess.Popen([cmds],shell=True,stdin=subprocess.PIPE,stdout=subprocess.PIPE,) ; stdout_value = proc.communicate()
-        return stdout_value[0]
-    except Exception as Error:
-        return str(Error)
 
 def MemoryUsed():
 	mem = 0;
@@ -104,41 +96,46 @@ def Producer(request,caller,job_id):
 	Stamps.append(job.timestamp); # stamp this job
 	return None,(RequestQueue, ResponseQueue,Stamps,MaxHistReqQ,ResponseCache);      # send nonce + state to Callback
 
-def Consumer(job_id):
+def Consumer(JobID):
 	global RequestQueue, ResponseQueue
+	# target the JobID
+	job_index = [job.job_id for job in RequestQueue].index(JobID);
 	try:
-		# target the JobID
-		job_index = [job.job_id for job in RequestQueue].index(job_id);
-		ResponseQueue.append(JobProcessor(RequestQueue.pop(job_index)));    # force the target job through the job processor
-		return [job.job_id for job in ResponseQueue].index(job_id),(RequestQueue, ResponseQueue,Stamps,MaxHistReqQ,ResponseCache);   # send processed job + state to Callback
+		if job_index:
+			ResponseQueue.append(JobProcessor(RequestQueue.pop(job_index)));
+			return ResponseQueue[[job.job_id for job in ResponseQueue].index(JobID)],(RequestQueue, ResponseQueue,Stamps,MaxHistReqQ,ResponseCache);   # send processed job + state to Callback
+		else:
+			Consumer(JobID);   # try again if you don't find the job
 	except:
-		Consumer(job_id);  # try again if something goes wrong
-
+		pass
+		
 def CheckAndUpdateState(feedback):
 
 	global RequestQueue, ResponseQueue, Stamps, MaxHistReqQ, ResponseCache, TransactionNumber
 
-	result, STATE = feedback;
+	try:
+		result, STATE = feedback;
+		RequestQueue, ResponseQueue,Stamps,MaxHistReqQ, ResponseCache = STATE;
 
-	RequestQueue, ResponseQueue,Stamps,MaxHistReqQ, ResponseCache = STATE;
+		RequestQueue = RequestQueue;
+		ResponseQueue = ResponseQueue;
+		Stamps = Stamps;
+		MaxHistReqQ = MaxHistReqQ;
+		ResponseCache = ResponseCache;
 
-	RequestQueue = RequestQueue;
-	ResponseQueue = ResponseQueue;
-	Stamps = Stamps;
-	MaxHistReqQ = MaxHistReqQ;
-	ResponseCache = ResponseCache;
-
-	if result != None:
-		AddToResponseCache(result);    # make job response available (failover)
-		if StateVerified():
-			TransactionNumber+=1;
-			if len(RequestQueue)>MaxHistReqQ:
-				MaxHistReqQ = len(RequestQueue);
-			print "[JobShop API] Call#: "+str(TransactionNumber)+" :: Stmps:"+str(len(Stamps))+"|ReqQ:"+str(len(RequestQueue))+"("+str(MaxHistReqQ)+")|ResQ:"+str(len(ResponseQueue))+"|RC:"+str(len(ResponseCache))+"|QoS:"+'{}%'.format(round((100*STATUS200/(STATUS404+STATUS200)),2))+"|Mem:"+MemoryUsed();
-	else:
-		if StateVerified()==False:
-			# print error message
-			print "[JobShop API] Error: Problem with system state, check API logs.";
+		if result != None:
+			AddToResponseCache(result);   # failover point
+			if StateVerified():
+				TransactionNumber+=1;
+				if len(RequestQueue)>MaxHistReqQ:
+					MaxHistReqQ = len(RequestQueue);
+				print "[JobShop API] Call#: "+str(TransactionNumber)+" :: Stmps:"+str(len(Stamps))+"|ReqQ:"+str(len(RequestQueue))+"("+str(MaxHistReqQ)+")|ResQ:"+str(len(ResponseQueue))+"|RC:"+str(len(ResponseCache))+"|QoS:"+'{}%'.format(round((100*STATUS200/(STATUS404+STATUS200)),2))+"|Mem:"+MemoryUsed();
+			else:
+				if StateVerified()==False:
+					# error message
+					print "[JobShop API] Error: Problem with system state, check API logs.";
+	except:
+		pass
 
 class FetchToken(Resource):
 
@@ -147,9 +144,6 @@ class FetchToken(Resource):
 	def get(self):
 
 		global RequestQueue,ResponseQueue,Stamps,MaxHistReqQ,ResponseCache, STATUS200, STATUS404
-
-		# manage process memory
-		shell_runner('sudo bash;echo 3 > /proc/sys/vm/drop_caches');
 
 		# manage object memory
 		memory_used = float(MemoryUsed().split('K')[0]);
@@ -170,11 +164,8 @@ class FetchToken(Resource):
 
 		Workflow = Pool(THREADS_PER_TRANSACTION);
 
-		producer = Workflow.apply_async(Producer,args=(REQUEST,CALLER,JOB_ID,),callback=CheckAndUpdateState);
-		consumer = Workflow.apply_async(Consumer,args=(JOB_ID),callback=CheckAndUpdateState); # send JobID to consumer to force right job selection
-
-		producer.get(); # best-effort create job
-		consumer.get(); # best-effort process job
+		producer = Workflow.apply_async(Producer,args=(REQUEST,CALLER,JOB_ID,),callback=CheckAndUpdateState).get();
+		consumer = Workflow.apply_async(Consumer,args=(JOB_ID,),callback=CheckAndUpdateState).get();
 
 		Workflow.close();
 		Workflow.join();
@@ -191,9 +182,6 @@ class FetchToken(Resource):
 	def post(self):
 
 		global RequestQueue,ResponseQueue,Stamps, MaxHistReqQ, ResponseCache, STATUS200, STATUS404
-
-		# manage process memory
-		shell_runner('sudo bash;echo 3 > /proc/sys/vm/drop_caches');
 
 		# manage object memory
 		memory_used = float(MemoryUsed().split('K')[0]);
@@ -214,11 +202,8 @@ class FetchToken(Resource):
 
 		Workflow = Pool(THREADS_PER_TRANSACTION);
 
-		producer = Workflow.apply_async(Producer,args=(REQUEST,CALLER,JOB_ID,),callback=CheckAndUpdateState);
-		consumer = Workflow.apply_async(Consumer,args=(JOB_ID),callback=CheckAndUpdateState); # send JobID to consumer to force right job selection
-
-		producer.get(); # best-effort create job
-		consumer.get(); # best-effort process job
+		producer = Workflow.apply_async(Producer,args=(REQUEST,CALLER,JOB_ID,),callback=CheckAndUpdateState).get();
+		consumer = Workflow.apply_async(Consumer,args=(JOB_ID,),callback=CheckAndUpdateState).get(); # send JobID to consumer to force right job selection
 
 		Workflow.close();
 		Workflow.join();
