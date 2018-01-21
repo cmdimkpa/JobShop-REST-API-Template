@@ -50,3 +50,13 @@ The Framework is big on memory management, and does the following to keep your A
 1. Regularly free up system memory by sending a shell 'cleanup' command ('echo 3 > /proc/sys/vm/drop_caches') BEFORE each new request is processed.
 
 2. Restricting object storage in memory to a user-defined limit. By default, this is just 50KB of RAM. The Framework will force shedding of targeted object memory once this limit is reached. This helps protect the API from fracturing when memory levels are critically low. 
+
+Something like this:
+
+![image](https://user-images.githubusercontent.com/26833356/35190144-f7dc4a58-fe5a-11e7-8c89-a187ff7c6e5a.png)
+
+## Performance: Speed and Quality of Service (Reliability)
+
+The framework is generally very fast because it makes use of Python's multi-processing capabilities. By analyzing log dumps of its output, such as the one below, I came to the following conclusions about its performance with regards to speed and QoS.
+
+
