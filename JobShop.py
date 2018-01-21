@@ -171,7 +171,7 @@ class FetchToken(Resource):
 		Workflow = Pool(THREADS_PER_TRANSACTION);
 
 		producer = Workflow.apply_async(Producer,args=(REQUEST,CALLER,JOB_ID,),callback=CheckAndUpdateState);
-		consumer = Workflow.apply_async(Consumer,args=(),callback=CheckAndUpdateState);
+		consumer = Workflow.apply_async(Consumer,args=(JOB_ID),callback=CheckAndUpdateState); # send JobID to consumer to force right job selection
 
 		producer.get(); # best-effort create job
 		consumer.get(); # best-effort process job
