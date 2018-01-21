@@ -103,13 +103,15 @@ def Producer(request,caller,job_id):
 	Stamps.append(job.timestamp); # stamp this job
 	return None,(RequestQueue, ResponseQueue,Stamps,MaxHistReqQ,ResponseCache);      # send nonce + state to Callback
 
-def Consumer():
+def Consumer(job_id):
 	global RequestQueue, ResponseQueue
 	try:
-		ResponseQueue.append(JobProcessor(RequestQueue.pop(-1)));    # Job-in, Job-out (JIJO) process
-		return ResponseQueue[-1],(RequestQueue, ResponseQueue,Stamps,MaxHistReqQ,ResponseCache);   # send processed job + state to Callback
+		# target the JobID
+		job_index = [job.job_id for job in RequestQueue].index(job_id);
+		ResponseQueue.append(JobProcessor(RequestQueue.pop(job_index)));    # force the target job through the job processor
+		return [job.job_id for job in ResponseQueue].index(job_id),(RequestQueue, ResponseQueue,Stamps,MaxHistReqQ,ResponseCache);   # send processed job + state to Callback
 	except:
-		return ResponseQueue[-1],(RequestQueue, ResponseQueue,Stamps,MaxHistReqQ,ResponseCache);   # send processed job + state to Callback
+		Consumer(job_id);  # try again if something goes wrong
 
 def CheckAndUpdateState(feedback):
 
@@ -212,7 +214,7 @@ class FetchToken(Resource):
 		Workflow = Pool(THREADS_PER_TRANSACTION);
 
 		producer = Workflow.apply_async(Producer,args=(REQUEST,CALLER,JOB_ID,),callback=CheckAndUpdateState);
-		consumer = Workflow.apply_async(Consumer,args=(),callback=CheckAndUpdateState);
+		consumer = Workflow.apply_async(Consumer,args=(JOB_ID),callback=CheckAndUpdateState); # send JobID to consumer to force right job selection
 
 		producer.get(); # best-effort create job
 		consumer.get(); # best-effort process job
