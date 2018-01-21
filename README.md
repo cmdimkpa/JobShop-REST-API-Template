@@ -73,3 +73,9 @@ The framework is generally very fast because it makes use of Python's multi-proc
 2. Quality of Service (QoS) is measured in terms of the probability that a random query to the API will return a non-null response (not {}). In practical terms, it is just the inverse of the average number of times you need to make the average query in order to get desired feedback. I found that increasing network load on small machines (like the AWS test machine used to demonstrate the API) progressively reduces the QoS (a normal outcome, I would expect).
 
 In my experiments, you need to query the API an average of 1.24 times for a non-null response under heavy load, an average QoS rating of 80.5% under heavy load (60K+ concurrent requests). Under normal to light loads, QoS is in the range of 90 - 99%.
+
+## Got Questions?
+
+Email me at cmdimkpa@gmail.com
+
+I hope you enjoy using JobShop v3!
