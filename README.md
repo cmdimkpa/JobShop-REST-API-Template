@@ -55,12 +55,21 @@ Something like this:
 
 ![image](https://user-images.githubusercontent.com/26833356/35190144-f7dc4a58-fe5a-11e7-8c89-a187ff7c6e5a.png)
 
-## Performance: Speed and Quality of Service (Reliability)
+## Best-Effort Delivery: Succeed or Fail
+
+The framework depends on finding a match to the unique JobId issued for a request in the ResponseCache at the time of sending the response to be able to successfully respond to a query. Where this does not happen, the request fails with a null {} returned.
+
+## Performance: Speed, Job Queue Management and Quality of Service (Reliability)
 
 The framework is generally very fast because it makes use of Python's multi-processing capabilities. By analyzing log dumps of its output, such as the one below, I came to the following conclusions about its performance with regards to speed and QoS:
 
 ![image](https://user-images.githubusercontent.com/26833356/35190174-cd27a7b6-fe5b-11e7-82c3-a8be4ed9edb3.png)
 
-1. Speed: the average time between state updates on my sample application is 789.6 ms. A state update happens after a consumer has finished processing a job. This is still less than 1 second, and of course also depends on your network connection (can be much better). But overall, acceptable for normal-latency applications, I should think.
+1. Speed: the average time between state updates (responses) on my sample application is 0.7s. Okay for real-time applications, I should think.
 
-2. 
+2. The Framework handles job queues very well. As the following excerpt from my tests show:
+<code>[JobShop API] #: 9297 :: Stmps: 20, ReqQ: 0 (12), ResQ: 20, Cache: 20, Mem: 8.0K</code>, After processing 9k+ requests, the highest number of pending requests on the queue was just 12 (I've never seen a higher figure since), while at that very instant, there was no job on the queue.
+
+2. Quality of Service (QoS) is measured in terms of the probability that a random query to the API will return a non-null response (not {}). In practical terms, it is just the inverse of the average number of times you need to make the average query in order to get desired feedback. I found that increasing network load on small machines (like the AWS test machine used to demonstrate the API) progressively reduces the QoS (a normal outcome, I would expect).
+
+In my experiments, you need to query the API an average of 1.24 times for a non-null response under heavy load, an average QoS rating of 80.5% under heavy load (60K+ concurrent requests). Under normal to light loads, QoS is in the range of 90 - 99%.
